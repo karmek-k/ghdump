@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-git/go-git/v5"
 	"github.com/google/go-github/v43/github"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -20,7 +21,9 @@ var cloneCmd = &cobra.Command{
 	Short: "Clones user's repositories",
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		//
 		// TODO: too much code :)
+		//
 		ctx := context.Background()
 
 		username := args[0]
@@ -51,12 +54,27 @@ var cloneCmd = &cobra.Command{
 				// process repos
 
 				// don't include orgs' repos
-				ownerLogin := repo.Owner.GetLogin()
-				if ownerLogin != username {
+				if repo.Owner.GetLogin() != username {
 					continue
 				}
 
-				fmt.Printf("%s (%s)\n", *repo.Name, *repo.GitURL)
+				cloneForks, err := cmd.Flags().GetBool("clone-forks")
+				if err != nil {
+					return err
+				}
+
+				// don't clone forks if the user doesn't want to
+				if *repo.Fork && !cloneForks {
+					continue
+				}
+
+				fmt.Printf("Cloning %s...\n", *repo.Name)
+
+				dir := cmd.Flag("output-dir").Value.String()
+				git.PlainClone(dir+"/"+*repo.Name, false, &git.CloneOptions{
+					URL: *repo.CloneURL,
+					Progress: nil,
+				})
 			}
 			
 			if resp.NextPage == 0 {
@@ -80,6 +98,8 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
+	cloneCmd.Flags().BoolP("clone-forks", "f", false, "Whether forks should be cloned")
 	cloneCmd.Flags().StringP("token", "t", "", "Personal access token (PAT)")
+	cloneCmd.Flags().StringP("output-dir", "o", "dump", "The directory repos should be cloned to")
 	cloneCmd.Flags().StringP("visibility", "v", "all", "Repo visibility (all, public, private)")
 }
