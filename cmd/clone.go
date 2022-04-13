@@ -32,15 +32,13 @@ var cloneCmd = &cobra.Command{
 				&oauth2.Token{AccessToken: pat},
 			)
 			httpClient = oauth2.NewClient(ctx, ts)
-
-			username = ""
 		}
 
 		client := github.NewClient(httpClient)
 
 		opt := &github.RepositoryListOptions{
 			ListOptions: github.ListOptions{PerPage: 10},
-			Visibility: "all",
+			Visibility: cmd.Flag("visibility").Value.String(),
 		}
 
 		for {
@@ -51,6 +49,13 @@ var cloneCmd = &cobra.Command{
 
 			for _, repo := range repos {
 				// process repos
+
+				// don't include orgs' repos
+				ownerLogin := repo.Owner.GetLogin()
+				if ownerLogin != username {
+					continue
+				}
+
 				fmt.Printf("%s (%s)\n", *repo.Name, *repo.GitURL)
 			}
 			
@@ -76,4 +81,5 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	cloneCmd.Flags().StringP("token", "t", "", "Personal access token (PAT)")
+	cloneCmd.Flags().StringP("visibility", "v", "all", "Repo visibility (all, public, private)")
 }
