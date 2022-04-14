@@ -7,89 +7,55 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"net/http"
 
-	"github.com/go-git/go-git/v5"
-	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
-	"github.com/google/go-github/v43/github"
 	"github.com/spf13/cobra"
-	"golang.org/x/oauth2"
+
+	"github.com/karmek-k/ghdump/pkg/connection"
 )
 
 // cloneCmd represents the clone command
 var cloneCmd = &cobra.Command{
 	Use:   "clone <username>",
 	Short: "Clones user's repositories",
-	Args: cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		//
-		// TODO: too much code :)
-		//
 		ctx := context.Background()
 
 		username := args[0]
-
-		var httpClient *http.Client = nil
 		pat := cmd.Flag("token").Value.String()
-		if pat != "" {
-			ts := oauth2.StaticTokenSource(
-				&oauth2.Token{AccessToken: pat},
-			)
-			httpClient = oauth2.NewClient(ctx, ts)
+		visibility := cmd.Flag("visibility").Value.String()
+
+		client := connection.CreateGitHubClient(ctx, username, pat)
+		gitAuth := connection.GitBasicAuth(username, pat)
+
+		repos, err := client.ListUserRepos(ctx, visibility)
+		if err != nil {
+			return err
 		}
 
-		client := github.NewClient(httpClient)
-
-		opt := &github.RepositoryListOptions{
-			ListOptions: github.ListOptions{PerPage: 10},
-			Visibility: cmd.Flag("visibility").Value.String(),
+		cloneForks, err := cmd.Flags().GetBool("clone-forks")
+		if err != nil {
+			return err
 		}
 
-		var gitAuth *gitHttp.BasicAuth = nil
-		if pat != "" {
-			gitAuth = &gitHttp.BasicAuth{
-				Username: username,
-				Password: pat,
-			}
-		}
-
-		for {
-			repos, resp, err := client.Repositories.List(ctx, username, opt)
-			if err != nil {
-				return err
+		for _, repo := range repos {
+			// don't include orgs' repos
+			if repo.Owner.GetLogin() != username {
+				continue
 			}
 
-			for _, repo := range repos {
-				// process repos
-
-				// don't include orgs' repos
-				if repo.Owner.GetLogin() != username {
-					continue
-				}
-
-				cloneForks, err := cmd.Flags().GetBool("clone-forks")
-				if err != nil {
-					return err
-				}
-
-				// don't clone forks if the user doesn't want to
-				if *repo.Fork && !cloneForks {
-					continue
-				}
-
-				fmt.Printf("Cloning %s...\n", *repo.Name)
-
-				dir := cmd.Flag("output-dir").Value.String()
-				git.PlainClone(dir+"/"+*repo.Name, false, &git.CloneOptions{
-					URL: *repo.CloneURL,
-					Auth: gitAuth,
-				})
+			// don't clone forks if the user doesn't want to
+			if *repo.Fork && !cloneForks {
+				continue
 			}
-			
-			if resp.NextPage == 0 {
-				break
-			}
-			opt.Page = resp.NextPage
+
+			fmt.Printf("Cloning %s...\n", *repo.Name)
+
+			connection.CloneRepo(connection.CloneRepoOptions{
+				Repo:      repo,
+				Directory: cmd.Flag("output-dir").Value.String(),
+				GitAuth:   gitAuth,
+			})
 		}
 
 		return nil
