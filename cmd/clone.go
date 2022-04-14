@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/go-git/go-git/v5"
+	gitHttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v43/github"
 	"github.com/spf13/cobra"
 	"golang.org/x/oauth2"
@@ -44,6 +45,14 @@ var cloneCmd = &cobra.Command{
 			Visibility: cmd.Flag("visibility").Value.String(),
 		}
 
+		var gitAuth *gitHttp.BasicAuth = nil
+		if pat != "" {
+			gitAuth = &gitHttp.BasicAuth{
+				Username: username,
+				Password: pat,
+			}
+		}
+
 		for {
 			repos, resp, err := client.Repositories.List(ctx, username, opt)
 			if err != nil {
@@ -73,7 +82,7 @@ var cloneCmd = &cobra.Command{
 				dir := cmd.Flag("output-dir").Value.String()
 				git.PlainClone(dir+"/"+*repo.Name, false, &git.CloneOptions{
 					URL: *repo.CloneURL,
-					Progress: nil,
+					Auth: gitAuth,
 				})
 			}
 			
