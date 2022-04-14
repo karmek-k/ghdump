@@ -24,12 +24,13 @@ func CreateGitHubClient(ctx context.Context, username, pat string) *GitHubClient
 	}
 
 	return &GitHubClient{
-		handle: github.NewClient(httpClient),
-		Pat:    pat,
+		handle:   github.NewClient(httpClient),
+		Username: username,
+		Pat:      pat,
 	}
 }
 
-func ListOptions(visibility string) *github.RepositoryListOptions {
+func listOptions(visibility string) *github.RepositoryListOptions {
 	return &github.RepositoryListOptions{
 		ListOptions: github.ListOptions{PerPage: 10},
 		Visibility:  visibility,
@@ -38,7 +39,7 @@ func ListOptions(visibility string) *github.RepositoryListOptions {
 
 func (c *GitHubClient) ListUserRepos(ctx context.Context, visibility string) ([]*github.Repository, error) {
 	var result []*github.Repository
-	opt := ListOptions(visibility)
+	opt := listOptions(visibility)
 
 	for {
 		repos, resp, err := c.handle.Repositories.List(ctx, c.Username, opt)
