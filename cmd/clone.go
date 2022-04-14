@@ -16,7 +16,7 @@ import (
 // cloneCmd represents the clone command
 var cloneCmd = &cobra.Command{
 	Use:   "clone <username>",
-	Short: "Clones user's repositories",
+	Short: "Clones user's (or organization's) repositories",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
@@ -53,6 +53,7 @@ var cloneCmd = &cobra.Command{
 
 			connection.CloneRepo(connection.CloneRepoOptions{
 				Repo:      repo,
+				CloneBare: false,
 				Directory: cmd.Flag("output-dir").Value.String(),
 				GitAuth:   gitAuth,
 			})
